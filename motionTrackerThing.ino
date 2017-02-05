@@ -187,16 +187,16 @@ void loop() {
     if ((mpuIntStatus & 0x10) || fifoCount == 1024) {
         // reset so we can continue cleanly
         mpu.resetFIFO();
-        
+
         if (debug) {
           Serial.print("error:{");
-          
+
           Serial.print("\"msg\": \"FIFO overflow\",");
-          
+
           Serial.print("\"data\":{");
           Serial.print("\"int\":"); Serial.print(mpuIntStatus); Serial.print(",");
-          Serial.print("\"count\":"); Serial.print(fifoCount); 
-  
+          Serial.print("\"count\":"); Serial.print(fifoCount);
+
           Serial.println("}}");
         }
 
@@ -240,7 +240,7 @@ void loop() {
         Serial.print("\"acceleration\":{");
         Serial.print("\"x\":"); Serial.print(aaWorld.x); Serial.print(",");
         Serial.print("\"y\":"); Serial.print(aaWorld.y); Serial.print(",");
-        Serial.print("\"r\":"); Serial.print(aaWorld.z);
+        Serial.print("\"z\":"); Serial.print(aaWorld.z);
         Serial.print("}");
 
         // Close
