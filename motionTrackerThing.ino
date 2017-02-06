@@ -58,7 +58,7 @@ VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measure
 VectorFloat gravity;    // [x, y, z]            gravity vector
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
-bool debug = true;
+bool debug = false;
 
 // ================================================================
 // ===               INTERRUPT DETECTION ROUTINE                ===
@@ -87,7 +87,7 @@ void setup() {
     // initialize serial communication
     // (115200 chosen because it is required for Teapot Demo output, but it's
     // really up to you depending on your project)
-    Serial.begin(9600);
+    Serial.begin(115200);
     while (!Serial); // wait for Leonardo enumeration, others continue immediately
 
     // NOTE: 8MHz or slower host processors, like the Teensy @ 3.3v or Ardunio
@@ -189,19 +189,22 @@ void loop() {
         mpu.resetFIFO();
 
         if (debug) {
-          Serial.print("error:{");
+          String output;
+          output += "error:{";
 
-          Serial.print("\"msg\": \"FIFO overflow\",");
+          output += "\"msg\": \"FIFO overflow\"";
 
-          Serial.print("\"data\":{");
-          Serial.print("\"int\":"); Serial.print(mpuIntStatus); Serial.print(",");
-          Serial.print("\"count\":"); Serial.print(fifoCount);
+          output += ",\"data\":{";
+          output += "\"int\":" + mpuIntStatus;
+          output += ",\"count\":" + fifoCount;
+          output += "}}";
 
-          Serial.println("}}");
+          Serial.println(output);
         }
 
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
     } else if (mpuIntStatus & 0x02) {
+        String output;
         // wait for correct available data length, should be a VERY short wait
         while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
 
@@ -217,19 +220,20 @@ void loop() {
         mpu.dmpGetGravity(&gravity, &q);
 
         /// Make the output
-        Serial.print("0.2:{");
+        output = output + "0.2:{";
 
         // TimeStamp
-        Serial.print("\"time\":"); Serial.print(millis()); Serial.print(",");
+        output += "\"time\":";
+        output += millis();
 
         // YPR output
         // display Euler angles in degrees
         mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-        Serial.print("\"ypr\":{");
-        Serial.print("\"y\":"); Serial.print(ypr[0] * 180/M_PI); Serial.print(",");
-        Serial.print("\"p\":"); Serial.print(ypr[1] * 180/M_PI); Serial.print(",");
-        Serial.print("\"r\":"); Serial.print(ypr[2] * 180/M_PI);
-        Serial.print("},");
+        output += ",\"ypr\":{";
+        output += "\"y\":";  output += (ypr[0] * 180/M_PI);
+        output += ",\"p\":"; output += (ypr[1] * 180/M_PI);
+        output += ",\"r\":"; output += (ypr[2] * 180/M_PI);
+        output += "}";
 
         // Aworld output
         // display initial world-frame acceleration, adjusted to remove gravity
@@ -237,14 +241,15 @@ void loop() {
         mpu.dmpGetAccel(&aa, fifoBuffer);
         mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
         mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
-        Serial.print("\"acceleration\":{");
-        Serial.print("\"x\":"); Serial.print(aaWorld.x); Serial.print(",");
-        Serial.print("\"y\":"); Serial.print(aaWorld.y); Serial.print(",");
-        Serial.print("\"z\":"); Serial.print(aaWorld.z);
-        Serial.print("}");
+        output += ",\"acceleration\":{";
+        output += "\"x\":";  output += aaWorld.x;
+        output += ",\"y\":"; output += aaWorld.y;
+        output += ",\"z\":"; output += aaWorld.z;
+        output += "}";
 
         // Close
-        Serial.println("}");
+        output += "}";
+        Serial.println(output);
 
         // blink LED to indicate activity
         blinkState = !blinkState;
