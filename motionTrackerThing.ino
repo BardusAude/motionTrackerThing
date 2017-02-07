@@ -40,7 +40,9 @@ MPU6050 mpu;
 
 
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
+#define OTHER_LED_PIN 3
 bool blinkState = false;
+bool readyState = false;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -148,8 +150,9 @@ void setup() {
         Serial.println(F(")"));
     }
 
-    // configure LED for output
+    // configure LEDs for output
     pinMode(LED_PIN, OUTPUT);
+    pinMode(OTHER_LED_PIN, OUTPUT);
 }
 
 
@@ -254,5 +257,10 @@ void loop() {
         // blink LED to indicate activity
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
+
+        if (!readyState && aaWorld.x < 10 && aaWorld.y < 10 && millis() > 5000) {
+          readyState = true;
+          digitalWrite(OTHER_LED_PIN, true);
+        }
     }
 }
