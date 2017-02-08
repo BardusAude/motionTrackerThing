@@ -8,7 +8,7 @@
 
 
 // AT commands
-// AT : Check the connection.
+// AT : Check the connection
 // AT+NAME : See default name
 // AT+ADDR : see default address
 // AT+VERSION : See version
@@ -19,13 +19,8 @@
 // AT+PSWD: see default password
 // Set them by using = e.g. AT+PSWD=0000
 
-
-
 #include <SoftwareSerial.h>
 SoftwareSerial BTserial(10, 11); // RX | TX
-// Connect the HC-05 TX to Arduino pin 2 RX.
-// Connect the HC-05 RX to Arduino pin 3 TX through a voltage divider.
-//
 
 char c = ' ';
 
