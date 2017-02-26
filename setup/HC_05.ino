@@ -6,6 +6,9 @@
 // See www.martyncurrey.com for details
 // And http://www.martyncurrey.com/arduino-with-hc-05-bluetooth-module-at-mode/
 
+String btname = "MotionTrackerThing";
+String baudrate = "115200,0,0";
+String password = "0000";
 
 // AT commands
 // AT : Check the connection
@@ -28,15 +31,28 @@ void setup()
 {
     Serial.begin(9600);
     Serial.println("Arduino is ready");
-    Serial.println("Remember to select Both NL & CR in the serial monitor");
+    Serial.println("Remember to select Both NL & CR in the serial monitor and Baud to 9600");
+    
+    Serial.println("");
+    Serial.println("Presss and hold the button on the BT unit, to put it in setup mode.");
 
+    Serial.println("");
+    Serial.println("Test the connection with by sending :");
+    Serial.println("AT");
+    Serial.println("  expect an 'OK' response, keep trying till you get one");
+    
+    Serial.println("");
+    Serial.println("Now run the following (customise the name if you want):");
+    Serial.println("AT+NAME:" + btname);
+    Serial.println("AT+UART:" + baudrate);
+    Serial.println("AT+PSWD:" + password);
+  
     // HC-05 default serial speed for AT mode is 38400
     BTserial.begin(38400);
 }
 
 void loop()
 {
-
     // Keep reading from HC-05 and send to Arduino Serial Monitor
     if (BTserial.available())
     {
@@ -50,5 +66,4 @@ void loop()
         c =  Serial.read();
         BTserial.write(c);
     }
-
 }
