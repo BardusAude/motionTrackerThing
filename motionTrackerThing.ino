@@ -253,6 +253,7 @@ void loop() {
         // Close
         output += "}";
         Serial.println(output);
+        Serial.flush();
 
         // blink LED to indicate activity
         blinkState = !blinkState;
