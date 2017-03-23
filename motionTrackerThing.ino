@@ -43,6 +43,7 @@ MPU6050 mpu;
 #define OTHER_LED_PIN 3
 bool blinkState = false;
 bool readyState = false;
+int readyCheck = 100000;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -259,9 +260,13 @@ void loop() {
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
 
-        if (!readyState && aaWorld.x < 10 && aaWorld.y < 10 && millis() > 5000) {
-          readyState = true;
-          digitalWrite(OTHER_LED_PIN, true);
+        if (!readyState && millis() > 5000) {  
+          // Average of the last 2 acc results -ish ;)
+          readyCheck = (readyCheck * 2 + abs(aaWorld.x) + abs(aaWorld.y)) / 3;
+          if (readyCheck < 20) {
+            readyState = true;
+            digitalWrite(OTHER_LED_PIN, true);
+          }
         }
     }
 }
