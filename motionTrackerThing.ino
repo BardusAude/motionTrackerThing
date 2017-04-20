@@ -36,13 +36,10 @@ MPU6050 mpu;
    http://code.google.com/p/arduino/issues/detail?id=958
  * ========================================================================= */
 
-
-
-
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 #define OTHER_LED_PIN 3
 bool blinkState = false;
-bool readyState = false;
+bool calibrating = false;
 int readyCheck = 100000;
 
 // MPU control/status vars
@@ -154,6 +151,9 @@ void setup() {
     // configure LEDs for output
     pinMode(LED_PIN, OUTPUT);
     pinMode(OTHER_LED_PIN, OUTPUT);
+
+    calibrating = true;
+    digitalWrite(OTHER_LED_PIN, calibrating);
 }
 
 
@@ -260,12 +260,12 @@ void loop() {
         blinkState = !blinkState;
         digitalWrite(LED_PIN, blinkState);
 
-        if (!readyState && millis() > 5000) {  
+        if (calibrating && millis() > 5000) {  
           // Average of the last 2 acc results -ish ;)
           readyCheck = (readyCheck * 2 + abs(aaWorld.x) + abs(aaWorld.y)) / 3;
           if (readyCheck < 20) {
-            readyState = true;
-            digitalWrite(OTHER_LED_PIN, true);
+            calibrating = false;
+            digitalWrite(OTHER_LED_PIN, false);
           }
         }
     }
