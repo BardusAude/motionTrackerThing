@@ -163,7 +163,7 @@ def detect_events(accel):
     # stft; doesn't seem to work as well as a spectrogram.
     # f, t, Zxx = signal.stft(df.loc[:, 'x'], fs=32, nperseg=16)
 
-    f, t, Sxx = signal.spectrogram(df.loc[:, 'x'], fs=32, nperseg=16, mode='magnitude')
+    f, t, Sxx = signal.spectrogram(df.loc[:, 'x'], fs=10, nperseg=16, mode='magnitude')
 
     # plot for spectrogram output
     fig, ax = plt.subplots()
@@ -175,7 +175,13 @@ def detect_events(accel):
     plt.xlabel('Time (sec)')
 
     hz_bin_4 = pd.DataFrame(Sxx[2, :].reshape(len(Sxx[2, :]), 1), columns=['4hz amplitude'])
-    hz_bin_4['4 hz threshold?'] = numpy.where(hz_bin_4['4hz amplitude'] > .2, 1, 0)
+
+    # Uncomment this to check the raw amplitudes of the 4 hz bin, for determining the threshold
+    # value below.
+    #print("DEBUG: 4hz amplitude: ")
+    #print(hz_bin_4['4hz amplitude'])
+
+    hz_bin_4['4 hz threshold?'] = numpy.where(hz_bin_4['4hz amplitude'] > .01, 1, 0)
 
     # Split the DataFrame into consecutive sequences of all 0 (below threshold) and all 1 ( above threshold)
     # https://stackoverflow.com/questions/40802800/pandas-dataframe-how-to-groupby-consecutive-values
@@ -198,6 +204,18 @@ def detect_events(accel):
 
     print(event_windows)
 
+
+    # Data for plotting
+    t = numpy.arange(len(df.loc[:, 'x']))#/10 #sample rate is 10 hz
+    s = df.loc[:, 'x']
+
+    fig, ax = plt.subplots()
+    ax.plot(t, s)
+
+    ax.set(xlabel='time (10 hz counts)', ylabel='accel (g)',
+           title='Brushing Accelerometer Data')
+    ax.grid()
+
     win_start = event_windows[0][0]
     win_end = event_windows[0][1]
 
@@ -210,7 +228,7 @@ def detect_events(accel):
     # Is this a better way of getting the power spectrum than numpy.abs(yf?)
     yf = (yf * yf.conj()).real
 
-    xf = fftpack.rfftfreq((win_end - win_start + 1), 1./32)
+    xf = fftpack.rfftfreq((win_end - win_start + 1), 1./10)
 
     fig, ax = plt.subplots()
     # plot for spectrogram output
@@ -229,14 +247,14 @@ def detect_events(accel):
     # periodic signal.
 
     # Data for plotting
-    t = numpy.arange(len(df.loc[:, 'x']))#/32 #sample rate is 32 hz
+    t = numpy.arange(len(df.loc[:, 'x']))#/10 #sample rate is 10 hz
     s = df.loc[:, 'x']
 
     fig, ax = plt.subplots()
     ax.plot(t, s)
 
-    ax.set(xlabel='time (32 hz counts)', ylabel='accel (g)',
-           title='Brushing Accelerometer Data')
+    ax.set(xlabel='time (10 hz counts)', ylabel='accel (g)',
+           title='Event Detection on Brushing Accelerometer Data')
     ax.grid()
 
     for item in event_windows:
