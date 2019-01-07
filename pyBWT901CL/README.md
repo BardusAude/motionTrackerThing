@@ -2,7 +2,7 @@
 
 
 
-## Version .1
+## Version .2
 
 pyBWT901CL demonstrates various aspects of capturing data from the BWT901CL Bluetooth 9 Axis IMU, and performing event detection on that data.
 
