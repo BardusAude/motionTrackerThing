@@ -59,6 +59,9 @@ The following must be done once each time the Linux system is booted up:
 
 No command line arguments are required. Start either fft_demo.py or rfcomm_serial.py by itself from the command line or a file browser.
 
+rfcomm_serial.py looks for motion along the x-axis of the accelerometer. So hold the accelerometer with the x-axis pointing either directly towards you,
+or directly away from you.
+
 
 
 ## License
