@@ -5,6 +5,7 @@ import pandas as pd
 from scipy import signal
 from scipy import fftpack
 import math
+import matplotlib
 import matplotlib.pyplot as plt
 
 
@@ -47,7 +48,7 @@ def sync_to_uq(ser):
     return synced, uq_bytes
 
 
-def acquire_data(accel, w_vel, mag_angle, capture_timeout):
+def acquire_data(accel, w_vel, mag_angle, sample_freq, capture_timeout):
     """
     Acquires accelerometer data and stores it in arrays.
 
@@ -57,6 +58,8 @@ def acquire_data(accel, w_vel, mag_angle, capture_timeout):
     :param w_vel: array of gyro angular velocities.
     :type mag_angle: 2D array of float
     :param mag_angle: array of magnetometer angles.
+    :type sample_freq: int
+     :param sample_freq: Sampling frequency in Hz
     :type capture_timeout: int
     :param capture_timeout: the amount of time to capture data for, in seconds
     :return: None
@@ -72,6 +75,12 @@ def acquire_data(accel, w_vel, mag_angle, capture_timeout):
 
         # Flushing the serial input buffer because why not
         ser.reset_input_buffer()
+
+        # Once we've opened the serial port and flushed the buffer, do a first alignment and
+        # initialize last_realtime froM the hardware clock.
+
+        synced, a_raw = sync_to_uq(ser)
+        last_realtime = time.clock_gettime(time.CLOCK_MONOTONIC_RAW)
 
         # Outer loop captures until timeout
         while (current - start) < capture_timeout:
@@ -90,7 +99,12 @@ def acquire_data(accel, w_vel, mag_angle, capture_timeout):
             else:
                 s = ser.read(11)
                 if s[0:2] != b'UQ':
-                    print("Desynced! " + str(s[0:2]))
+                    # Commenting out these desyncs, because we already know we are getting desynced in
+                    # nominal operation. NaN counting statistics in detect_events() give roughly equivalent
+                    # diagnostic information, and don't cause the real time performance hit of writing
+                    # to stdout.
+
+                    # print("Desynced! " + str(s[0:2]))
                     synced = False
                     continue
                 else:
@@ -101,7 +115,7 @@ def acquire_data(accel, w_vel, mag_angle, capture_timeout):
             # Read the 'UR' frame and get the gyro angular velocity data.
             s = ser.read(11)
             if s[0:2] != b'UR':
-                print("Desynced! " + str(s[0:2]))
+                # print("Desynced! " + str(s[0:2]))
                 synced = False
                 desync_count += 1
                 continue
@@ -113,7 +127,7 @@ def acquire_data(accel, w_vel, mag_angle, capture_timeout):
             # Read the 'US' frame and get the magnetometer angles.
             s = ser.read(11)
             if s[0:2] != b'US':
-                print("Desynced! " + str(s[0:2]))
+                # print("Desynced! " + str(s[0:2]))
                 synced = False
                 desync_count += 1
                 continue
@@ -126,12 +140,41 @@ def acquire_data(accel, w_vel, mag_angle, capture_timeout):
             s = ser.read(11)
             if __name__ == '__main__':
                 if s[0:2] != b'UT':
-                    print("Desynced! " + str(s[0:2]))
+                    # print("Desynced! " + str(s[0:2]))
                     synced = False
                     desync_count += 1
                     continue
 
-            # We made it to the end of one complete frame, so we are assuming that this is good data.
+            # We made it to the end of one complete frame, so we are assuming that this is a good data point.
+            # Before capturing this data, we need to check if a desync has caused data dropout. If so, we'll
+            # fill with NaN.
+
+            realtime = time.clock_gettime(time.CLOCK_MONOTONIC_RAW)
+
+            # If the elapsed time since we last captured a good data point is greater than the BWT901CL's
+            # sampling period, then we lost one or more data points to a desync.
+
+            time_delta = int(round((realtime - last_realtime) / (1.0 / sample_freq)))
+
+            # ...and update last_realtime to the current realtime, for use on the next cycle.
+
+            last_realtime = realtime
+
+            # If we lost data, append NaN's for the missing data points, then append the new good data point.
+            # If we didn't lose data, just append the new good data point.
+
+            if time_delta > 1:
+
+                #print("DEBUG: time_delta: " + str(time_delta))
+
+                for i in range(time_delta - 1):
+
+                    for idx in range(3):
+
+                        accel[idx].append(math.nan)
+                        w_vel[idx].append(math.nan)
+                        mag_angle[idx].append(math.nan)
+
             for idx, value in enumerate([a_1_int, a_2_int, a_3_int]):
                 accel[idx].append(value / 32768.0 * 16)
 
@@ -157,29 +200,36 @@ def detect_events(accel):
 
     df = pd.DataFrame(data=accel[0], columns=['x'])
 
-    # hyperoptimization parameters: stft window size, nperseg,
+    print("Number of NaN points: " + str(df.isna().sum()))
+
+    # Doing a linear interpolation that replaces the NaN placeholders for desynced, dropped data
+    # with a straight line between the last good data point before a dropout and the next good data
+    # point. This does seem to improve the signal-to-noise ratio in the FFT.
+    df = df.interpolate()
+
+    # hyper-optimization parameters: stft window size, nperseg,
     # and event frequency and amplitude thresholds
 
     # stft; doesn't seem to work as well as a spectrogram.
     # f, t, Zxx = signal.stft(df.loc[:, 'x'], fs=32, nperseg=16)
 
-    f, t, Sxx = signal.spectrogram(df.loc[:, 'x'], fs=10, nperseg=16, mode='magnitude')
+    f, t, sxx = signal.spectrogram(df.loc[:, 'x'], fs=10, nperseg=16, mode='magnitude')
 
     # plot for spectrogram output
     fig, ax = plt.subplots()
 
     ax.set(xlabel='time spectrogram', ylabel='frequency bins',
            title='Brushing Spectrogram')
-    plt.pcolormesh(t, f, Sxx)
+    plt.pcolormesh(t, f, sxx)
     plt.ylabel('Frequency (Hz)')
     plt.xlabel('Time (sec)')
 
-    hz_bin_4 = pd.DataFrame(Sxx[2, :].reshape(len(Sxx[2, :]), 1), columns=['4hz amplitude'])
+    hz_bin_4 = pd.DataFrame(sxx[2, :].reshape(len(sxx[2, :]), 1), columns=['4hz amplitude'])
 
     # Uncomment this to check the raw amplitudes of the 4 hz bin, for determining the threshold
     # value below.
-    #print("DEBUG: 4hz amplitude: ")
-    #print(hz_bin_4['4hz amplitude'])
+    # print("DEBUG: 4hz amplitude: ")
+    # print(hz_bin_4['4hz amplitude'])
 
     hz_bin_4['4 hz threshold?'] = numpy.where(hz_bin_4['4hz amplitude'] > .01, 1, 0)
 
@@ -204,10 +254,12 @@ def detect_events(accel):
 
     print(event_windows)
 
-
     # Data for plotting
-    t = numpy.arange(len(df.loc[:, 'x']))#/10 #sample rate is 10 hz
+    t = numpy.arange(len(df.loc[:, 'x']))  # /10 if sample rate is 10 hz
     s = df.loc[:, 'x']
+
+    current_cmap = matplotlib.cm.get_cmap()
+    current_cmap.set_bad(color='red')
 
     fig, ax = plt.subplots()
     ax.plot(t, s)
@@ -216,8 +268,8 @@ def detect_events(accel):
            title='Brushing Accelerometer Data')
     ax.grid()
 
-    win_start = event_windows[0][0]
-    win_end = event_windows[0][1]
+    win_start = event_windows[1][0]
+    win_end = event_windows[1][1]
 
     assert(win_end > win_start)
 
@@ -237,7 +289,7 @@ def detect_events(accel):
 
     plt.plot(xf, yf)
 
-    peaks, peaks_dict = signal.find_peaks(yf, height=50)
+    peaks, peaks_dict = signal.find_peaks(yf, height=100)
 
     print(peaks, peaks_dict)
     plt.plot(xf[peaks], yf[peaks], "x")
@@ -247,7 +299,7 @@ def detect_events(accel):
     # periodic signal.
 
     # Data for plotting
-    t = numpy.arange(len(df.loc[:, 'x']))#/10 #sample rate is 10 hz
+    t = numpy.arange(len(df.loc[:, 'x']))  # /10 if sample rate is 10 hz
     s = df.loc[:, 'x']
 
     fig, ax = plt.subplots()
@@ -273,9 +325,10 @@ def main():
     accel = [[] for i in range(3)]
     w_vel = [[] for i in range(3)]
     mag_angle = [[] for i in range(3)]
+    default_sample_freq = 10
     capture_timeout = 60
 
-    acquire_data(accel, w_vel, mag_angle, capture_timeout)
+    acquire_data(accel, w_vel, mag_angle, default_sample_freq, capture_timeout)
 
     detect_events(accel)
 
